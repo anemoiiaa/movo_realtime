@@ -72,6 +72,7 @@ public:
   cv::Point2d new_prncPt;
   cv::Point2d focalLen;
   cv::Point2d prncPt;
+
   void image_processing(const cv::Mat& img);
 
   void calibration_info()

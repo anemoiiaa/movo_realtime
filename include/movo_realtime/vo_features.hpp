@@ -66,7 +66,7 @@ void featureDetection(Mat img_1, vector<KeyPoint>& keypoints_1, Mat& descriptors
 
 void featureTracking(Mat img_1, Mat img_2, vector<KeyPoint>& keypoints_1, vector<KeyPoint>& keypoints_2, Mat& descriptors_1, Mat& descriptors_2, vector<DMatch>& good_matches, vector<Point2f>& prevFeatures, vector<Point2f>& currFeatures) {
 
-    
+
     const static auto& orb = cv::ORB::create();
     orb->detectAndCompute(img_2, cv::noArray(), keypoints_2, descriptors_2);
 

@@ -72,16 +72,20 @@ void MovoRealtime::image_processing(const cv::Mat& img)
     cvtColor(prevImage, img_1, COLOR_BGR2GRAY);
     cvtColor(currImage, img_2, COLOR_BGR2GRAY);
 
+    vector<Point2f> empty1, empty2;
+
     featureDetection(img_1, keypoints_1, descriptors_1);
-    featureTracking(img_1, img_2, keypoints_1, keypoints_2, descriptors_1, descriptors_2, good_matches);
+    featureTracking(img_1, img_2, keypoints_1, keypoints_2, descriptors_1, descriptors_2, good_matches, empty1, empty2);
 
     for (size_t i = 0; i < good_matches.size(); i++) {
         points1.push_back(keypoints_1[good_matches[i].queryIdx].pt);
         points2.push_back(keypoints_2[good_matches[i].trainIdx].pt);
     }
 
-    E = findEssentialMat(points2, points1, focalLen.x(), prncPt, RANSAC, 0.999, 1.0, mask);
-    recoverPose(E, points2, points1, R, t, focalLen.x(), prncPt, mask);
+
+
+    E = findEssentialMat(points2, points1, focalLen.x, prncPt, RANSAC, 0.999, 1.0, mask);
+    recoverPose(E, points2, points1, R, t, focalLen.x, prncPt, mask);
 
     R_f = R.clone();
     t_f = t.clone();
