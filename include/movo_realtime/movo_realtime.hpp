@@ -44,8 +44,16 @@ public:
   MovoRealtime();
   ~MovoRealtime();
 
+  double scale = 1.00;
+
+  vector<uchar> status;
+
   Mat prevImage;
   Mat currImage;
+
+  Mat img_1, img_2;
+
+  Mat currImage_c;
 
   vector<KeyPoint> keypoints_1, keypoints_2;
   Mat descriptors_1, descriptors_2;
@@ -72,6 +80,9 @@ public:
   cv::Point2d new_prncPt;
   cv::Point2d focalLen;
   cv::Point2d prncPt;
+
+  vector<Point2f> prevFeatures;
+  vector<Point2f> currFeatures;
 
   void image_processing(const cv::Mat& img);
 

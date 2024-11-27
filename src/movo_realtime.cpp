@@ -111,65 +111,98 @@ void MovoRealtime::image_processing(const cv::Mat &img) {
   Mat display_frame = img.clone();
 
   if (first && !second) {
-    currImage = img.clone();
+    currImage_c = img.clone();
     second = true;
     first = false;
     return;
   } else if (second && !first) {
-    prevImage = currImage.clone();
-    currImage = img.clone();
+    prevImage = currImage_c.clone();
+    currImage_c = img.clone();
+
 
     Mat img_1, img_2;
     cvtColor(prevImage, img_1, COLOR_BGR2GRAY);
-    cvtColor(currImage, img_2, COLOR_BGR2GRAY);
+    cvtColor(currImage_c, img_2, COLOR_BGR2GRAY);
 
-    points1.clear();
-    points2.clear();
+    // points1.clear();
+    // points2.clear();
+    keypoints_1.clear();
+    keypoints_2.clear();
 
-    featureDetection(img_1, keypoints_1, descriptors_1);
+
+    featureDetection(img_1, points1);
     vector<Point2f> prevFeatures, currFeatures;
-    featureTracking(img_1, img_2, keypoints_1, keypoints_2, descriptors_1, descriptors_2, good_matches, prevFeatures, currFeatures);
+    featureTracking(img_1, img_2, points1, points2, status);
+
+    E = findEssentialMat(points2, points1, focalLen.y, prncPt, RANSAC, 0.999, 1.0, mask);
+    int inliers = recoverPose(E, points2, points1, R, t, focalLen.y, prncPt, mask);
+
+    Mat prevPts(2,points1.size(), CV_64F), currPts(2,points2.size(), CV_64F);
+
+    for(int i=0;i<points1.size();i++)	{   //this (x,y) combination makes sense as observed from the source code of triangulatePoints on GitHub
+  		prevPts.at<double>(0,i) = points1.at(i).x;
+  		prevPts.at<double>(1,i) = points1.at(i).y;
+
+  		currPts.at<double>(0,i) = points2.at(i).x;
+  		currPts.at<double>(1,i) = points2.at(i).y;
+    }
+
+    t_total = t_total + R_total * t * 0.3;  // Scale factor 0.5 적용
+    R_total = R * R_total;
+
+    points1 = points2;
+
+    // 궤적 업데이트
+    trajectory_pos.x += (t_total.at<double>(0) * 2);
+    trajectory_pos.y += (t_total.at<double>(2) * 2);
+
+    circle(traj, trajectory_pos, 1, CV_RGB(255, 0, 0), 2);
+
+    // 현재 상태 표시
+    putText(display_frame, format("Tracked Features: %d", (int)good_matches.size()), Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
+    putText(display_frame, format("Inliers: %d", inliers), Point(10, 50), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
 
     // Draw current features
-    drawKeypoints(display_frame, keypoints_2, display_frame, Scalar(0, 255, 0));
+    //drawKeypoints(display_frame, keypoints_2, display_frame, Scalar(0, 255, 0));
 
-    if (good_matches.size() >= 8) {  // 8점 알고리즘을 위한 최소 매칭점
-      for (size_t i = 0; i < good_matches.size(); i++) {
-        points1.push_back(keypoints_1[good_matches[i].queryIdx].pt);
-        points2.push_back(keypoints_2[good_matches[i].trainIdx].pt);
-      }
+    // if (good_matches.size() >= 8) {
+    //   cout << "1" << endl;  // 8점 알고리즘을 위한 최소 매칭점
+    //   for (size_t i = 0; i < good_matches.size(); i++) {
+    //     points1.push_back(keypoints_1[good_matches[i].queryIdx].pt);
+    //     points2.push_back(keypoints_2[good_matches[i].trainIdx].pt);
+    //   }
 
-      // Essential Matrix 계산
-      E = findEssentialMat(points2, points1, focalLen.x, prncPt, RANSAC, 0.999, 1.0, mask);
+    //   // Essential Matrix 계산
+    //   E = findEssentialMat(points2, points1, focalLen.y, prncPt, RANSAC, 0.999, 1.0, mask);
 
-      // Recover pose
-      Mat R, t;
-      int inliers = recoverPose(E, points2, points1, R, t, focalLen.x, prncPt, mask);
+    //   // Recover pose
+    //   Mat R, t;
+    //   int inliers = recoverPose(E, points2, points1, R, t, focalLen.x, prncPt, mask);
 
-      // 매칭점이 충분히 많고 inlier가 일정 수준 이상일 때만 업데이트
-      if (inliers > 30) {
-        // Update rotation and translation
-        t_total = t_total + R_total * t * 0.5;  // Scale factor 0.5 적용
-        R_total = R * R_total;
+    //   // 매칭점이 충분히 많고 inlier가 일정 수준 이상일 때만 업데이트
+    //   if (false ) {
+    //     // Update rotation and translation
+    //     t_total = t_total + R_total * t * 0.3;  // Scale factor 0.5 적용
+    //     R_total = R * R_total;
 
-        // 궤적 업데이트
-        trajectory_pos.x += (t_total.at<double>(0) * 2);
-        trajectory_pos.y += (t_total.at<double>(2) * 2);
+    //     // 궤적 업데이트
+    //     trajectory_pos.x += (t_total.at<double>(0) * 2);
+    //     trajectory_pos.y += (t_total.at<double>(2) * 2);
 
-        circle(traj, trajectory_pos, 1, CV_RGB(255, 0, 0), 2);
+    //     circle(traj, trajectory_pos, 1, CV_RGB(255, 0, 0), 2);
 
-        // 현재 상태 표시
-        putText(display_frame, format("Tracked Features: %d", (int)good_matches.size()), Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
-        putText(display_frame, format("Inliers: %d", inliers), Point(10, 50), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
+    //     // 현재 상태 표시
+    //     putText(display_frame, format("Tracked Features: %d", (int)good_matches.size()), Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
+    //     putText(display_frame, format("Inliers: %d", inliers), Point(10, 50), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
 
-        // Translation vector 표시
-        putText(display_frame, format("t = [%.2f %.2f %.2f]", t_total.at<double>(0), t_total.at<double>(1), t_total.at<double>(2)), Point(10, 70), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
-      } else {
-        putText(display_frame, "Low inliers - motion rejected", Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 0, 255), 1);
-      }
-    } else {
-      putText(display_frame, "Not enough features", Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 0, 255), 1);
-    }
+    //     // Translation vector 표시
+    //     putText(display_frame, format("t = [%.2f %.2f %.2f]", t_total.at<double>(0), t_total.at<double>(1), t_total.at<double>(2)), Point(10, 70), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 255, 0), 1);
+    //   } else {
+    //     putText(display_frame, "Low inliers - motion rejected", Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 0, 255), 1);
+    //   }
+    // } else {
+    //   putText(display_frame, "Not enough features", Point(10, 30), FONT_HERSHEY_PLAIN, 1, CV_RGB(0, 0, 255), 1);
+    // }
 
     // 결과 표시
     Mat traj_display = traj.clone();
